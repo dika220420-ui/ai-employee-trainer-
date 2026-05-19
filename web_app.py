@@ -8,7 +8,7 @@ from datetime import datetime
 import os
 
 # 1. Masukkan API Key Google Gemini milikmu di sini
-API_KEY = st.secrets["AIzaSyAUNLfZotUB2EgPNFbdzgzGRGnK7qEY9uU"]
+API_KEY = "AIzaSyAUNLfZotUB2EgPNFbdzgzGRGnK7qEY9uU"
 
 # Inisialisasi Client
 client = genai.Client(api_key=API_KEY)
