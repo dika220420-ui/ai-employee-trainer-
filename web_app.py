@@ -100,7 +100,7 @@ if halaman == "📱 Chat Training Karyawan":
     if st.session_state.nama_tersimpan != "":
         nama_karyawan = st.session_state.nama_tersimpan
         
-        # Tombol kecil di pojok untuk "Keluar/Ganti Akun" jika dibutuhkan
+        # Tombol kecil di pojok untuk "Keluar/Ganti Akun"
         col_nama, col_logout = st.columns([4, 1])
         with col_nama:
             st.success(f"Selamat belajar, **{nama_karyawan}**! Silakan tanyakan hal apa pun terkait SOP toko di kolom bawah.")
@@ -108,6 +108,20 @@ if halaman == "📱 Chat Training Karyawan":
             if st.button("🚪 Ganti Nama"):
                 st.session_state.nama_tersimpan = ""
                 st.session_state.messages = [] # Bersihkan chat lama
+                st.rerun()
+        
+        # --- PASTIKAN KODE TOMBOL INI BERADA DI SINI DAN TIDAK MENJOROK KE DALAM IF YANG SALAH ---
+        st.write("💡 **Contoh pertanyaan cepat (klik untuk menanyakan):**")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("💬 Bagaimana cara menyapa pelanggan?"):
+                st.session_state.messages.append({"role": "user", "content": "Bagaimana cara menyapa pelanggan?"})
+                st.rerun()
+                
+        with col2:
+            if st.button("💬 Bagaimana aturan pembayaran di kafe?"):
+                st.session_state.messages.append({"role": "user", "content": "Bagaimana aturan pembayaran di kafe?"})
                 st.rerun()
         
         # --- POSISI TOMBOL SARAN PERTANYAAN (MUNCUL SINKRON DENGAN NAMA) ---
