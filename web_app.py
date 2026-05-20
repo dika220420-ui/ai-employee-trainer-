@@ -1,242 +1,79 @@
 import streamlit as st
 from google import genai
 from google.genai import types
-import pypdf
-import docx
-import pandas as pd
-from datetime import datetime
-import os
 
-# 1. Masukkan API Key Google Gemini milikmu di sini
-API_KEY = "AIzaSyAUNLfZotUB2EgPNFbdzgzGRGnK7qEY9uU"
+# ==========================================
+# 1. KONFIGURASI HALAMAN UTAMA
+# ==========================================
+st.set_page_config(page_title="AI Employee Trainer", page_icon="🤖", layout="centered")
 
-# Inisialisasi Client
-client = genai.Client(api_key=API_KEY)
+# ==========================================
+# 2. SETUP API KEY & INISIALISASI GEMINI
+# ==========================================
+# Mengambil kunci dengan aman dari Streamlit Secrets
+try:
+    API_KEY = st.secrets["AIzaSyAUNLfZotUB2EgPNFbdzgzGRGnK7qEY9uU"]
+    client = genai.Client(api_key=API_KEY)
+except KeyError:
+    st.error("API Key belum disetting di Streamlit Secrets! Silakan atur di menu Manage App -> Secrets.")
+    st.stop()
 
-# Konfigurasi Tampilan Halaman Web
-st.set_page_config(page_title="AI Employee Trainer & Dashboard", page_icon="🤖", layout="wide")
+# ==========================================
+# 3. SETUP MEMORI (SESSION STATE)
+# ==========================================
+# Mengingat nama karyawan dan riwayat chat agar tidak hilang saat refresh
+if "nama_tersimpan" not in st.session_state:
+    st.session_state.nama_tersimpan = ""
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-# --- FUNGSI DATABASE UTK MENYIMPAN RIWAYAT CHAT & PERFORMA ---
-DB_FILE = "database_chat.csv"
+# ==========================================
+# 4. MEMBACA FILE SOP
+# ==========================================
+# Pastikan file sop_kafe.txt ada di dalam folder yang sama di GitHub
+sop_content = "SOP belum dimuat."
+try:
+    with open("sop_kafe.txt", "r", encoding="utf-8") as file:
+        sop_content = file.read()
+except FileNotFoundError:
+    st.warning("⚠️ File sop_kafe.txt tidak ditemukan di folder proyek!")
 
-def simpan_ke_database(nama, pertanyaan, skor_pemahaman):
-    """Menyimpan data pertanyaan dan performa karyawan ke file CSV"""
-    waktu_sekarang = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    data_baru = pd.DataFrame([{
-        "Waktu": waktu_sekarang,
-        "Nama Karyawan": nama,
-        "Pertanyaan": pertanyaan,
-        "Skor Pemahaman": int(skor_pemahaman)
-    }])
-    
-    if not os.path.isfile(DB_FILE):
-        data_baru.to_csv(DB_FILE, index=False)
-    else:
-        data_baru.to_csv(DB_FILE, mode='a', header=False, index=False)
+# Instruksi inti untuk membatasi AI agar menjawab HANYA dari SOP
+instruksi_sistem = f"""
+Kamu adalah AI Employee Trainer yang tegas dan profesional. 
+Tugasmu adalah melatih karyawan baru berdasarkan dokumen SOP perusahaan berikut:
 
-def ekstrak_teks_dari_pdf(file_pdf):
-    pembaca_pdf = pypdf.PdfReader(file_pdf)
-    teks = ""
-    for halaman in pembaca_pdf.pages:
-        teks += halaman.extract_text() + "\n"
-    return teks
+{sop_content}
 
-def ekstrak_teks_dari_docx(file_docx):
-    dokumen = docx.Document(file_docx)
-    teks = ""
-    for paragraf in dokumen.paragraphs:
-        teks += paragraf.text + "\n"
-    return teks
+Aturan menjawab:
+1. Jawab dengan ramah namun profesional.
+2. Selalu rujuk jawabanmu HANYA pada SOP di atas.
+3. Jika karyawan bertanya hal di luar SOP, tolak dengan sopan dan katakan itu di luar materi training.
+"""
 
-# --- SIDEBAR NAVIGASI HALAMAN ---
-st.sidebar.title("🚀 Menu Sistem AI")
-halaman = st.sidebar.radio("Pilih Tampilan Halaman:", ("📱 Chat Training Karyawan", "📊 Dashboard Performa Admin"))
-
-st.sidebar.write("---")
-st.sidebar.header("📁 Pengaturan Dokumen SOP")
-opsi_sop = st.sidebar.radio("Pilih Metode Input SOP:", ("Gunakan SOP Kafe Default", "Upload File (PDF / Word / TXT)"))
-
-isi_sop = ""
-if opsi_sop == "Gunakan SOP Kafe Default":
-    try:
-        with open("sop_kafe.txt", 'r', encoding='utf-8') as file:
-            isi_sop = file.read()
-    except FileNotFoundError:
-        isi_sop = "SOP default tidak ditemukan."
-else:
-    file_diunggah = st.sidebar.file_uploader("Unggah file SOP toko di sini:", type=["pdf", "docx", "txt"])
-    if file_diunggah is not None:
-        if file_diunggah.name.endswith(".pdf"):
-            isi_sop = ekstrak_teks_dari_pdf(file_diunggah)
-        elif file_diunggah.name.endswith(".docx"):
-            isi_sop = ekstrak_teks_dari_docx(file_diunggah)
-        elif file_diunggah.name.endswith(".txt"):
-            isi_sop = file_diunggah.read().decode("utf-8")
-
-# ==================== HALAMAN 1: CHAT TRAINING KARYAWAN ====================
-if halaman == "📱 Chat Training Karyawan":
+# ==========================================
+# 5. HALAMAN LOGIN (JIKA NAMA BELUM DIISI)
+# ==========================================
+if st.session_state.nama_tersimpan == "":
     st.title("🤖 AI Employee Trainer")
-    st.subheader("Ruang Training Mandiri Karyawan Baru")
-    st.write("---")
+    st.markdown("### 📝 Pendaftaran Training Mandiri")
     
-    # ==================== LOGIKA MEMORI NAMA KARYAWAN ====================
-    # Membuat wadah memori kosong untuk nama jika belum ada
-    if "nama_tersimpan" not in st.session_state:
-        st.session_state.nama_tersimpan = ""
-
-    # Jika memori nama masih kosong, tampilkan kolom input
-    if st.session_state.nama_tersimpan == "":
-        nama_input = st.text_input("Masukkan Nama Lengkapmu sebelum memulai:", placeholder="Contoh: Andika")
-        
-        # Tombol untuk mengunci nama ke dalam memori
-        if st.button("Masuk ke Ruang Training 🚀"):
-            if nama_input.strip() != "":
-                st.session_state.nama_tersimpan = nama_input
-                st.rerun() # Refresh agar kolom input hilang dan chat terbuka
-            else:
-                st.warning("Nama tidak boleh kosong, Bro!")
-                
-    # Jika nama sudah tersimpan di memori, langsung buka chatnya!
-    if st.session_state.nama_tersimpan != "":
-        nama_karyawan = st.session_state.nama_tersimpan
-        
-        # Tombol kecil di pojok untuk "Keluar/Ganti Akun"
-        col_nama, col_logout = st.columns([4, 1])
-        with col_nama:
-            st.success(f"Selamat belajar, **{nama_karyawan}**! Silakan tanyakan hal apa pun terkait SOP toko di kolom bawah.")
-        with col_logout:
-            if st.button("🚪 Ganti Nama"):
-                st.session_state.nama_tersimpan = ""
-                st.session_state.messages = [] # Bersihkan chat lama
-                st.rerun()
-        
-        # --- PASTIKAN KODE TOMBOL INI BERADA DI SINI DAN TIDAK MENJOROK KE DALAM IF YANG SALAH ---
-        st.write("💡 **Contoh pertanyaan cepat (klik untuk menanyakan):**")
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            if st.button("💬 Bagaimana cara menyapa pelanggan?"):
-                st.session_state.messages.append({"role": "user", "content": "Bagaimana cara menyapa pelanggan?"})
-                st.rerun()
-                
-        with col2:
-            if st.button("💬 Bagaimana aturan pembayaran di kafe?"):
-                st.session_state.messages.append({"role": "user", "content": "Bagaimana aturan pembayaran di kafe?"})
-                st.rerun()
-        
-        # --- POSISI TOMBOL SARAN PERTANYAAN (MUNCUL SINKRON DENGAN NAMA) ---
-        st.write("💡 **Contoh pertanyaan cepat (klik untuk menanyakan):**")
-        col1, col2 = st.columns(2)
-        
-        # Wadah riwayat chat
-        if "messages" not in st.session_state:
-            st.session_state.messages = []
-
-        for message in st.session_state.messages:
-            with st.chat_message(message["role"]):
-                st.markdown(message["content"])
-
-        # Logika menangani input teks atau tombol cepat
-        prompt = st.chat_input("Tanyakan sesuatu tentang SOP perusahaan...")
-        if "quick_prompt" in st.session_state:
-            prompt = st.session_state.quick_prompt
-            del st.session_state.quick_prompt
-
-        # Input Chat Diproses
-        if prompt:
-            with st.chat_message("user"):
-                st.markdown(prompt)
-            st.session_state.messages.append({"role": "user", "content": prompt})
-
-            # Instruksi ketat untuk AI + Perintah Penilaian Rahasia
-            instruksi_sistem = f"""
-            Kamu adalah AI Training Manager. Jawab pertanyaan karyawan dengan ramah hanya berdasarkan SOP ini:
-            {isi_sop}
-            
-            ATURAN TAMBAHAN WAJIB:
-            Di baris paling terakhir dari jawabanmu, kamu WAJIB menuliskan kode evaluasi rahasia untuk sistem berupa angka tingkat pemahaman karyawan terhadap SOP (skor dari 10 sampai 100). Format penulisan wajib persis seperti ini: [SKOR: angka].
-            Contoh: Jika pertanyaannya sangat cerdas dan relevan beri [SKOR: 95]. Jika pertanyaannya konyol/di luar SOP beri [SKOR: 30].
-            """
-
-            with st.chat_message("assistant"):
-                message_placeholder = st.empty()
-                
-                response = client.models.generate_content(
-                    model='gemini-2.5-flash',
-                    contents=prompt,
-                    config=types.GenerateContentConfig(system_instruction=instruksi_sistem, temperature=0.3)
-                )
-                
-                jawaban_mentah = response.text
-                
-                # Memisahkan jawaban teks dengan skor rahasia agar tidak terlihat oleh karyawan
-                skor_terdeteksi = 70 
-                if "[SKOR:" in jawaban_mentah:
-                    bagian = jawaban_mentah.split("[SKOR:")
-                    jawaban_bersih = bagian[0].strip()
-                    skor_terdeteksi = bagian[1].replace("]", "").strip()
-                else:
-                    jawaban_bersih = jawaban_mentah
-                
-                message_placeholder.markdown(jawaban_bersih)
-                
-            st.session_state.messages.append({"role": "assistant", "content": jawaban_bersih})
-            
-            # SIMPAN DATA KE DATABASE CSV
-            simpan_ke_database(nama_karyawan, prompt, skor_terdeteksi)
-            st.rerun()
-    else:
-        st.warning("Silakan isi nama kamu terlebih dahulu di kolom atas untuk membuka akses chat AI!")
-
-# ==================== HALAMAN 2: DASHBOARD PERFORMA ADMIN ====================
-elif halaman == "📊 Dashboard Performa Admin":
-    st.title("🔒 Verifikasi Akses Admin")
-    st.subheader("Halaman ini dilindungi. Silakan masukkan kata sandi Anda.")
-    st.write("---")
+    nama_input = st.text_input("Masukkan Nama Lengkapmu sebelum memulai:", placeholder="Contoh: Andika")
     
-    # 1. Kolom Input Password Rahasia
-    # Ganti "kopiMaju2026" dengan password apa saja yang diinginkan oleh pemilik toko
-    password_input = st.text_input("Masukkan Password Admin:", type="password")
-    
-    if password_input == "kopiMaju2026":
-        st.success("🔓 Akses Diberikan! Selamat Datang, Manajer.")
-        st.write("---")
-        
-        # --- SEMUA KODE DASHBOARD KAMU MASUK KE DALAM SINI ---
-        if os.path.isfile(DB_FILE):
-            df = pd.read_csv(DB_FILE)
-            
-            # Statistik Utama
-            total_pertanyaan = len(df)
-            rata_skor = round(df["Skor Pemahaman"].mean(), 1)
-            karyawan_aktif = df["Nama Karyawan"].nunique()
-            
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric(label="Total Pertanyaan Masuk", value=total_pertanyaan)
-            with col2:
-                st.metric(label="Rata-rata Skor Pemahaman Karyawan", value=f"{rata_skor} / 100")
-            with col3:
-                st.metric(label="Jumlah Karyawan Terdaftar", value=karyawan_aktif)
-                
-            st.write("---")
-            
-            # Tabel 1: Performa Karyawan
-            st.subheader("📈 Ranking Performa Pemahaman Karyawan")
-            df_performa = df.groupby("Nama Karyawan").agg(
-                Rata_Rata_Skor=("Skor Pemahaman", "mean"),
-                Jumlah_Pertanyaan=("Pertanyaan", "count")
-            ).reset_index()
-            df_performa["Rata_Rata_Skor"] = df_performa["Rata_Rata_Skor"].round(1)
-            st.dataframe(df_performa.sort_values(by="Rata_Rata_Skor", ascending=False), use_container_width=True)
-            
-            # Tabel 2: Log Pertanyaan Real-time
-            st.subheader("📋 Log Pertanyaan Karyawan (Real-time)")
-            st.dataframe(df.sort_values(by="Waktu", ascending=False), use_container_width=True)
-            
+    if st.button("Masuk ke Ruang Training 🚀"):
+        if nama_input.strip() != "":
+            st.session_state.nama_tersimpan = nama_input.strip()
+            st.rerun() # Refresh layar untuk masuk ke ruang chat
         else:
-            st.info("Belum ada data pertanyaan yang masuk.")
-            
-    elif password_input != "":
-        # Jika salah ketik password
-        st.error("❌ Password Salah! Akses Ditolak.")
+            st.warning("Nama tidak boleh kosong, Bro!")
+
+# ==========================================
+# 6. RUANG TRAINING (JIKA NAMA SUDAH ADA)
+# ==========================================
+else:
+    nama_karyawan = st.session_state.nama_tersimpan
+    
+    # --- Header & Tombol Ganti Nama ---
+    col_nama, col_logout = st.columns([4, 1])
+    with col_nama:
+        st.success(f
