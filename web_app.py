@@ -79,22 +79,40 @@ if halaman == "📱 Chat Training Karyawan":
     st.subheader("Ruang Training Mandiri Karyawan Baru")
     st.write("---")
     
-    # Input Nama Karyawan di Awal
-    nama_karyawan = st.text_input("Masukkan Nama Lengkapmu sebelum memulai:", placeholder="Contoh: Andika")
-    
-    if nama_karyawan:
-        st.success(f"Selamat belajar, **{nama_karyawan}**! Silakan tanyakan hal apa pun terkait SOP toko di kolom bawah.")
+    # ==================== LOGIKA MEMORI NAMA KARYAWAN ====================
+    # Membuat wadah memori kosong untuk nama jika belum ada
+    if "nama_tersimpan" not in st.session_state:
+        st.session_state.nama_tersimpan = ""
+
+    # Jika memori nama masih kosong, tampilkan kolom input
+    if st.session_state.nama_tersimpan == "":
+        nama_input = st.text_input("Masukkan Nama Lengkapmu sebelum memulai:", placeholder="Contoh: Andika")
         
-        # --- POSISI TOMBOL SARAN PERTANYAAN BARU (SELALU MUNCUL SINKRON DENGAN NAMA) ---
+        # Tombol untuk mengunci nama ke dalam memori
+        if st.button("Masuk ke Ruang Training 🚀"):
+            if nama_input.strip() != "":
+                st.session_state.nama_tersimpan = nama_input
+                st.rerun() # Refresh agar kolom input hilang dan chat terbuka
+            else:
+                st.warning("Nama tidak boleh kosong, Bro!")
+                
+    # Jika nama sudah tersimpan di memori, langsung buka chatnya!
+    if st.session_state.nama_tersimpan != "":
+        nama_karyawan = st.session_state.nama_tersimpan
+        
+        # Tombol kecil di pojok untuk "Keluar/Ganti Akun" jika dibutuhkan
+        col_nama, col_logout = st.columns([4, 1])
+        with col_nama:
+            st.success(f"Selamat belajar, **{nama_karyawan}**! Silakan tanyakan hal apa pun terkait SOP toko di kolom bawah.")
+        with col_logout:
+            if st.button("🚪 Ganti Nama"):
+                st.session_state.nama_tersimpan = ""
+                st.session_state.messages = [] # Bersihkan chat lama
+                st.rerun()
+        
+        # --- POSISI TOMBOL SARAN PERTANYAAN (MUNCUL SINKRON DENGAN NAMA) ---
         st.write("💡 **Contoh pertanyaan cepat (klik untuk menanyakan):**")
         col1, col2 = st.columns(2)
-        with col1:
-            if st.button("💬 Bagaimana cara menyapa pelanggan?", key="btn1"):
-                st.session_state.quick_prompt = "Bagaimana cara menyapa pelanggan?"
-        with col2:
-            if st.button("💬 Bagaimana aturan pembayaran di kafe?", key="btn2"):
-                st.session_state.quick_prompt = "Bagaimana aturan pembayaran di kafe?"
-        st.write("---")
         
         # Wadah riwayat chat
         if "messages" not in st.session_state:
