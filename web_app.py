@@ -12,7 +12,7 @@ st.set_page_config(page_title="AI Employee Trainer", page_icon="🤖", layout="c
 # ==========================================
 # Mengambil kunci dengan aman dari Streamlit Secrets
 try:
-    API_KEY = st.secrets["AIzaSyAUNLfZotUB2EgPNFbdzgzGRGnK7qEY9uU"]
+    API_KEY = st.secrets["AIzaSyB95IVToE2ZYv6IR8S-ZX17FkCtcJd_GgU"]
     client = genai.Client(api_key=API_KEY)
 except KeyError:
     st.error("API Key belum disetting di Streamlit Secrets! Silakan atur di menu Manage App -> Secrets.")
