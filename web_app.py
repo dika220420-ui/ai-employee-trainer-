@@ -76,4 +76,4 @@ else:
     # --- Header & Tombol Ganti Nama ---
     col_nama, col_logout = st.columns([4, 1])
     with col_nama:
-        st.success(f"Selamat belajar,**{nama_karyawan}**! Silahkan tanyakan hal apapun terkait SOP di bawah."
+        st.success(f"Selamat belajar,**{nama_karyawan}**! Silahkan tanyakan hal apapun terkait SOP di bawah.")
