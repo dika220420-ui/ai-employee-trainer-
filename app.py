@@ -12,7 +12,7 @@ st.set_page_config(page_title="AI Employee Trainer", page_icon="🤖", layout="c
 # ==========================================
 try:
     # Membaca brankas rahasia TOML Streamlit Cloud
-    API_KEY = st.secrets["GEMINI_API_KEY"]
+    API_KEY = st.secrets["AIzaSyB95IVToE2ZYv6IR8S-ZX17FkCtcJd_GgU"]
     client = genai.Client(api_key=API_KEY)
 except KeyError:
     st.error("⚠️ API Key belum disetting dengan benar di Streamlit Secrets! Pastikan di menu Secrets sudah tertulis format TOML: GEMINI_API_KEY = 'KUNCI_API_KAMU'")
